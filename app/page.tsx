@@ -1,42 +1,91 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ManualIngestion } from "@/components/manual-ingestion"
-import { RssIngestion } from "@/components/rss-ingestion"
+import { TiFeeds } from "@/components/ti-feeds"
 import { CapriWidget } from "@/components/capri-widget"
 import { SectorMap } from "@/components/sector-map"
 import type { Alert } from "@/types/alert"
-import { calculateCapriScore } from "@/lib/capri-calculator"
+import { calculateCapriScoresBySector, calculateCapriScore } from "@/lib/capri-calculator"
 import { Shield } from "lucide-react"
+import { SecurityControls } from "@/components/security-controls"
+import { RealTimeStatus } from "@/components/real-time-status"
+import { generateSampleAlerts } from "@/lib/sample-data"
 
 export default function Home() {
   const [alerts, setAlerts] = useState<Alert[]>([])
-  const [capriScore, setCapriScore] = useState({
+  const [sectorScores, setSectorScores] = useState<any[]>([])
+  const [overallCapriScore, setOverallCapriScore] = useState({
     score: 3.2,
     breakdown: {
-      P: 1.0, // National Posture
-      X: 1.0, // Exploitation Observed
-      S: 1.0, // Sector Match
-      U: 1.0, // Urgency
-      K: 0.6, // KEV Presence
-      C: 1.0, // Critical Infrastructure
-      A: 0.9, // Alert Targeting Score
-      CSS: 0.95, // Computed Sector Score
+      P: 1.0,
+      X: 1.0,
+      S: 1.0,
+      U: 1.0,
+      K: 0.6,
+      C: 1.0,
+      A: 0.9,
+      R: 0.8,
+      T: 0.7,
+      CSS: 0.85,
     },
-    rationale: "Shields Up posture targeting Energy sector with observed exploitation",
+    rationale: "Loading sector-specific intelligence...",
+    categories: {
+      alerts: 0.8,
+      research: 0.7,
+      threatIntel: 0.75,
+      vulnerability: 0.6,
+      geopolitical: 0.8,
+    },
   })
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        setIsLoading(true)
+
+        // Load sample data
+        const sampleAlerts = generateSampleAlerts()
+        setAlerts(sampleAlerts)
+
+        // Calculate sector-specific CAPRI scores
+        const scores = calculateCapriScoresBySector(sampleAlerts)
+        setSectorScores(scores)
+
+        // Calculate overall score for backward compatibility
+        const overallScore = calculateCapriScore(sampleAlerts)
+        setOverallCapriScore(overallScore)
+
+        setIsLoading(false)
+      } catch (error) {
+        console.error("Error initializing data:", error)
+        setIsLoading(false)
+      }
+    }
+
+    initializeData()
+  }, [])
 
   const handleNewAlert = (alert: Alert) => {
-    const newAlerts = [alert, ...alerts]
-    setAlerts(newAlerts)
+    try {
+      const newAlerts = [alert, ...alerts]
+      setAlerts(newAlerts)
 
-    // Calculate new CAPRI score based on all alerts
-    const newScore = calculateCapriScore(newAlerts)
-    setCapriScore(newScore)
+      // Calculate new sector-specific CAPRI scores
+      const newSectorScores = calculateCapriScoresBySector(newAlerts)
+      setSectorScores(newSectorScores)
 
-    // Store in localStorage
-    localStorage.setItem("cisaCapriAlerts", JSON.stringify(newAlerts))
+      // Calculate new overall score
+      const newOverallScore = calculateCapriScore(newAlerts)
+      setOverallCapriScore(newOverallScore)
+
+      // Store in localStorage
+      localStorage.setItem("cisaCapriAlerts", JSON.stringify(newAlerts))
+    } catch (error) {
+      console.error("Error processing new alert:", error)
+    }
   }
 
   return (
@@ -49,7 +98,8 @@ export default function Home() {
             <h1 className="text-2xl font-bold">CISA CAPRI</h1>
           </div>
           <div className="text-sm">
-            <p>CISA Alert Prioritization and Readiness Index</p>
+            <p>Critical Infrastructure Alert Prioritization and Readiness Index</p>
+            <p className="text-xs opacity-75">Sector-Specific Multi-Source Intelligence Integration</p>
           </div>
         </div>
       </header>
@@ -59,31 +109,41 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* CAPRI Widget - Left Column */}
           <div className="lg:col-span-1">
-            <CapriWidget capriScore={capriScore} />
+            <CapriWidget sectorScores={sectorScores} />
           </div>
 
           {/* Main Content - Right Column */}
           <div className="lg:col-span-2">
+            {/* Real-Time Status Bar */}
+            <div className="mb-4">
+              <RealTimeStatus onDataUpdate={handleNewAlert} />
+            </div>
             <Tabs defaultValue="manual" className="w-full">
               <TabsList className="w-full bg-gray-100 p-1">
                 <TabsTrigger value="manual" className="flex-1">
                   Manual Alert Ingestion
                 </TabsTrigger>
-                <TabsTrigger value="rss" className="flex-1">
-                  CISA RSS Feeds
+                <TabsTrigger value="ti-feeds" className="flex-1">
+                  TI Feeds
                 </TabsTrigger>
                 <TabsTrigger value="map" className="flex-1">
                   Sector Map
+                </TabsTrigger>
+                <TabsTrigger value="controls" className="flex-1">
+                  Security Controls
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="manual">
                 <ManualIngestion onAlertIngested={handleNewAlert} />
               </TabsContent>
-              <TabsContent value="rss">
-                <RssIngestion onAlertIngested={handleNewAlert} />
+              <TabsContent value="ti-feeds">
+                <TiFeeds onAlertIngested={handleNewAlert} />
               </TabsContent>
               <TabsContent value="map">
-                <SectorMap capriScore={capriScore} />
+                <SectorMap capriScore={overallCapriScore} />
+              </TabsContent>
+              <TabsContent value="controls">
+                <SecurityControls alerts={alerts} capriScore={overallCapriScore} />
               </TabsContent>
             </Tabs>
           </div>
@@ -94,7 +154,7 @@ export default function Home() {
       <footer className="bg-[#005288] text-white p-4 mt-8">
         <div className="container mx-auto text-center text-sm">
           <p>CISA CAPRI - Cybersecurity and Infrastructure Security Agency</p>
-          <p className="text-xs mt-1">Alert Prioritization and Readiness Index</p>
+          <p className="text-xs mt-1">Sector-Specific Multi-Source Threat Intelligence Integration Platform</p>
         </div>
       </footer>
     </main>

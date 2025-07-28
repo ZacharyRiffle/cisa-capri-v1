@@ -1,29 +1,90 @@
+"use client"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, BarChart3, Info, TrendingUp, TrendingDown, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { INTELLIGENCE_CATEGORIES, type CriticalSector } from "@/lib/capri-calculator"
+import { useState } from "react"
 
-interface CapriScoreBreakdown {
-  P: number // National Posture
-  X: number // Exploitation Observed
-  S: number // Sector Match
-  U: number // Urgency
-  K: number // KEV Presence
-  C: number // Critical Infrastructure
-  A: number // Alert Targeting Score
-  CSS: number // Computed Sector Score
-}
-
-interface CapriWidgetProps {
-  capriScore: {
-    score: number
-    breakdown: CapriScoreBreakdown
-    rationale: string
+interface SectorScore {
+  sector: CriticalSector
+  score: number
+  breakdown: {
+    P: number
+    X: number
+    S: number
+    U: number
+    K: number
+    C: number
+    A: number
+    R: number
+    T: number
+    CSS: number
+  }
+  rationale: string
+  categories: {
+    alerts: number
+    research: number
+    threatIntel: number
+    vulnerability: number
+    geopolitical: number
   }
 }
 
-export function CapriWidget({ capriScore }: CapriWidgetProps) {
-  // Round to 1 decimal place for display
-  const displayScore = Math.round(capriScore.score * 10) / 10
+interface CapriWidgetProps {
+  sectorScores: SectorScore[]
+}
+
+export function CapriWidget({ sectorScores }: CapriWidgetProps) {
+  const [selectedSector, setSelectedSector] = useState<CriticalSector>("Energy")
+
+  // Handle loading state and empty data
+  if (!sectorScores || sectorScores.length === 0) {
+    return (
+      <Card className="border-[#005288] border-t-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[#005288] flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            CAPRI by Sector
+          </CardTitle>
+          <CardDescription>Critical Infrastructure Alert Prioritization Index</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-[#005288] mb-4" />
+            <p className="text-sm text-gray-600">Loading sector scores...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Get selected sector data with fallback
+  const currentSector = sectorScores.find((s) => s.sector === selectedSector) || sectorScores[0]
+
+  // Additional safety check
+  if (!currentSector) {
+    return (
+      <Card className="border-[#005288] border-t-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[#005288] flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            CAPRI by Sector
+          </CardTitle>
+          <CardDescription>Critical Infrastructure Alert Prioritization Index</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertTriangle className="h-8 w-8 text-amber-500 mb-4" />
+            <p className="text-sm text-gray-600">No sector data available</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const displayScore = Math.round(currentSector.score * 10) / 10
 
   // Determine severity level based on score
   const getSeverityColor = (score: number) => {
@@ -32,29 +93,112 @@ export function CapriWidget({ capriScore }: CapriWidgetProps) {
     return "text-green-600" // Low - Green
   }
 
+  const getSeverityBg = (score: number) => {
+    if (score >= 4) return "bg-[#d92525]"
+    if (score >= 3) return "bg-amber-500"
+    return "bg-green-600"
+  }
+
   const severityColor = getSeverityColor(displayScore)
+
+  // Sort sectors by score for overview
+  const sortedSectors = [...sectorScores].sort((a, b) => b.score - a.score)
 
   return (
     <Card className="border-[#005288] border-t-4">
       <CardHeader className="pb-2">
         <CardTitle className="text-[#005288] flex items-center gap-2">
           <AlertTriangle className="h-5 w-5" />
-          CAPRI Level
+          CAPRI by Sector
         </CardTitle>
-        <CardDescription>Current Alert Prioritization and Readiness Index</CardDescription>
+        <CardDescription>Critical Infrastructure Alert Prioritization Index</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center justify-center py-4">
-          <div className={`text-6xl font-bold ${severityColor}`}>{displayScore}</div>
-          <div className="text-sm text-center mt-2 max-w-xs">{capriScore.rationale}</div>
+        {/* Quick sector selector */}
+        <div className="mb-4">
+          <select
+            value={selectedSector}
+            onChange={(e) => setSelectedSector(e.target.value as CriticalSector)}
+            className="w-full p-2 border rounded-md text-sm"
+          >
+            {sortedSectors.map((sector) => (
+              <option key={sector.sector} value={sector.sector}>
+                {sector.sector} - {sector.score.toFixed(1)}
+              </option>
+            ))}
+          </select>
         </div>
 
+        {/* Current Sector Score Display */}
+        <div className="flex flex-col items-center justify-center py-4 border-b">
+          <div className="text-sm font-medium text-gray-600 mb-1">{currentSector.sector}</div>
+          <div className={`text-5xl font-bold ${severityColor}`}>{displayScore}</div>
+          <div className="text-xs text-center mt-2 max-w-xs text-gray-600">{currentSector.rationale}</div>
+        </div>
+
+        {/* Intelligence Categories with Descriptions */}
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart3 className="h-4 w-4 text-[#005288]" />
+            <h3 className="text-sm font-medium text-[#005288]">Intelligence Categories</h3>
+          </div>
+
+          {Object.entries(INTELLIGENCE_CATEGORIES).map(([key, category]) => {
+            const score = currentSector.categories[key as keyof typeof currentSector.categories] || 0
+            return (
+              <div key={key} className="p-3 border rounded-lg bg-gray-50">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{category.name}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {category.weight}%
+                    </Badge>
+                  </div>
+                  <Badge className={getSeverityBg(score * 5)} variant="default">
+                    {(score * 100).toFixed(0)}%
+                  </Badge>
+                </div>
+                <p className="text-xs text-gray-600">{category.description}</p>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Top Risk Sectors Overview */}
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <h3 className="text-sm font-medium text-[#005288] mb-2 flex items-center gap-2">
+            <Info className="h-4 w-4" />
+            Highest Risk Sectors
+          </h3>
+          <div className="space-y-2">
+            {sortedSectors.slice(0, 5).map((sector, index) => (
+              <div key={sector.sector} className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">#{index + 1}</span>
+                  <span>{sector.sector}</span>
+                  {sector.score >= 4 ? (
+                    <TrendingUp className="h-3 w-3 text-red-500" />
+                  ) : sector.score >= 3 ? (
+                    <TrendingUp className="h-3 w-3 text-amber-500" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-green-500" />
+                  )}
+                </div>
+                <Badge className={getSeverityBg(sector.score)} variant="default">
+                  {sector.score.toFixed(1)}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Detailed Score Breakdown */}
         <div className="mt-4">
-          <h3 className="text-sm font-medium mb-2">Score Breakdown</h3>
+          <h3 className="text-sm font-medium mb-2">Score Breakdown - {currentSector.sector}</h3>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">Code</TableHead>
+                <TableHead className="w-[80px]">Code</TableHead>
                 <TableHead>Meaning</TableHead>
                 <TableHead className="text-right">Value</TableHead>
               </TableRow>
@@ -63,42 +207,47 @@ export function CapriWidget({ capriScore }: CapriWidgetProps) {
               <TableRow>
                 <TableCell className="font-medium">P</TableCell>
                 <TableCell>National Posture</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.P.toFixed(1)}</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.P || 0).toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">X</TableCell>
                 <TableCell>Exploitation Observed</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.X.toFixed(1)}</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.X || 0).toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">S</TableCell>
                 <TableCell>Sector Match</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.S.toFixed(1)}</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.S || 0).toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">U</TableCell>
                 <TableCell>Urgency</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.U.toFixed(1)}</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.U || 0).toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">K</TableCell>
                 <TableCell>KEV Presence</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.K.toFixed(1)}</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.K || 0).toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">C</TableCell>
                 <TableCell>Critical Infrastructure</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.C.toFixed(1)}</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.C || 0).toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="font-medium">A</TableCell>
-                <TableCell>Alert Targeting Score</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.A.toFixed(1)}</TableCell>
+                <TableCell className="font-medium">R</TableCell>
+                <TableCell>Research Intelligence</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.R || 0).toFixed(1)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">T</TableCell>
+                <TableCell>Threat Intelligence</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.T || 0).toFixed(1)}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className="font-medium">CSS</TableCell>
                 <TableCell>Computed Sector Score</TableCell>
-                <TableCell className="text-right">{capriScore.breakdown.CSS.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{(currentSector.breakdown.CSS || 0).toFixed(2)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>

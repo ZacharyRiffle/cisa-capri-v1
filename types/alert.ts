@@ -10,4 +10,5 @@ export interface Alert {
   criticalInfrastructure: boolean
   summary?: string
   url?: string
+  source?: string // Added source field for TI attribution
 }
