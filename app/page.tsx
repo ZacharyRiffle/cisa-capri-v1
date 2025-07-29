@@ -5,13 +5,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ManualIngestion } from "@/components/manual-ingestion"
 import { TiFeeds } from "@/components/ti-feeds"
 import { CapriWidget } from "@/components/capri-widget"
-import { SectorMap } from "@/components/sector-map"
+import { DatabaseView } from "@/components/database-view"
 import type { Alert } from "@/types/alert"
 import { calculateCapriScoresBySector, calculateCapriScore } from "@/lib/capri-calculator"
 import { Shield } from "lucide-react"
 import { SecurityControls } from "@/components/security-controls"
-import { RealTimeStatus } from "@/components/real-time-status"
+import { HistoricalTrends } from "@/components/historical-trends"
+import { SiemIntegration } from "@/components/siem-integration"
 import { generateSampleAlerts } from "@/lib/sample-data"
+import { RealTimeStatus } from "@/components/real-time-status"
 
 export default function Home() {
   const [alerts, setAlerts] = useState<Alert[]>([])
@@ -126,11 +128,17 @@ export default function Home() {
                 <TabsTrigger value="ti-feeds" className="flex-1">
                   TI Feeds
                 </TabsTrigger>
-                <TabsTrigger value="map" className="flex-1">
-                  Sector Map
+                <TabsTrigger value="database" className="flex-1">
+                  Database
                 </TabsTrigger>
                 <TabsTrigger value="controls" className="flex-1">
-                  Security Controls
+                  Controls
+                </TabsTrigger>
+                <TabsTrigger value="trends" className="flex-1">
+                  Trends
+                </TabsTrigger>
+                <TabsTrigger value="integrations" className="flex-1">
+                  SIEM & APIs
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="manual">
@@ -139,11 +147,17 @@ export default function Home() {
               <TabsContent value="ti-feeds">
                 <TiFeeds onAlertIngested={handleNewAlert} />
               </TabsContent>
-              <TabsContent value="map">
-                <SectorMap capriScore={overallCapriScore} />
+              <TabsContent value="database">
+                <DatabaseView alerts={alerts} sectorScores={sectorScores} />
               </TabsContent>
               <TabsContent value="controls">
                 <SecurityControls alerts={alerts} capriScore={overallCapriScore} />
+              </TabsContent>
+              <TabsContent value="trends">
+                <HistoricalTrends alerts={alerts} sectorScores={sectorScores} />
+              </TabsContent>
+              <TabsContent value="integrations">
+                <SiemIntegration alerts={alerts} />
               </TabsContent>
             </Tabs>
           </div>
