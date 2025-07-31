@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ManualIngestion } from "@/components/manual-ingestion"
 import { TiFeeds } from "@/components/ti-feeds"
 import { CapriWidget } from "@/components/capri-widget"
 import { DatabaseView } from "@/components/database-view"
@@ -120,11 +119,8 @@ export default function Home() {
             <div className="mb-4">
               <RealTimeStatus onDataUpdate={handleNewAlert} />
             </div>
-            <Tabs defaultValue="manual" className="w-full">
+            <Tabs defaultValue="ti-feeds" className="w-full">
               <TabsList className="w-full bg-gray-100 p-1">
-                <TabsTrigger value="manual" className="flex-1">
-                  Manual Alert Ingestion
-                </TabsTrigger>
                 <TabsTrigger value="ti-feeds" className="flex-1">
                   TI Feeds
                 </TabsTrigger>
@@ -138,12 +134,9 @@ export default function Home() {
                   Trends
                 </TabsTrigger>
                 <TabsTrigger value="integrations" className="flex-1">
-                  SIEM & APIs
+                  APIs & Integrations
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="manual">
-                <ManualIngestion onAlertIngested={handleNewAlert} />
-              </TabsContent>
               <TabsContent value="ti-feeds">
                 <TiFeeds onAlertIngested={handleNewAlert} />
               </TabsContent>

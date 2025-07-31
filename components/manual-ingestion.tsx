@@ -1,151 +1,276 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Upload, FileText, AlertTriangle, CheckCircle, X } from "lucide-react"
 import type { Alert as AlertType } from "@/types/alert"
 
 interface ManualIngestionProps {
-  onAlertIngested: (alert: AlertType) => void
+  onAlertSubmitted: (alert: AlertType) => void
 }
 
-export function ManualIngestion({ onAlertIngested }: ManualIngestionProps) {
-  const [inputValue, setInputValue] = useState("")
-  const [status, setStatus] = useState<{
-    type: "success" | "error" | null
-    message: string
-  }>({ type: null, message: "" })
-  const [parsedAlert, setParsedAlert] = useState<AlertType | null>(null)
+export function ManualIngestion({ onAlertSubmitted }: ManualIngestionProps) {
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [sector, setSector] = useState("")
+  const [urgency, setUrgency] = useState<"Low" | "Medium" | "High" | "Critical">("Medium")
+  const [source, setSource] = useState("")
+  const [kev, setKev] = useState(false)
+  const [exploitation, setExploitation] = useState(false)
+  const [criticalInfrastructure, setCriticalInfrastructure] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitResult, setSubmitResult] = useState<string | null>(null)
 
-  const handleIngest = () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setSubmitResult(null)
+
     try {
-      // Try to parse as JSON first
-      let alertData: AlertType
-
-      try {
-        alertData = JSON.parse(inputValue)
-      } catch (e) {
-        // If not valid JSON, try to parse as simplified format
-        const lines = inputValue.split("\n")
-        alertData = {
-          id: `manual-${Date.now()}`,
-          title: "Manual Alert",
-          date: new Date().toISOString(),
-          posture: "Shields Ready",
-          sector: "General",
-          urgency: "Medium",
-          kev: false,
-          exploitation: false,
-          criticalInfrastructure: false,
-        }
-
-        // Parse each line for key:value pairs
-        lines.forEach((line) => {
-          const [key, value] = line.split(":")
-          if (key && value) {
-            const trimmedKey = key.trim().toLowerCase()
-            const trimmedValue = value.trim()
-
-            if (trimmedKey === "posture") alertData.posture = trimmedValue
-            if (trimmedKey === "sector") alertData.sector = trimmedValue
-            if (trimmedKey === "urgency") alertData.urgency = trimmedValue as any
-            if (trimmedKey === "kev") alertData.kev = trimmedValue.toLowerCase() === "true"
-            if (trimmedKey === "exploitation") alertData.exploitation = trimmedValue.toLowerCase() === "true"
-            if (trimmedKey === "critical" || trimmedKey === "criticalinfrastructure")
-              alertData.criticalInfrastructure = trimmedValue.toLowerCase() === "true"
-          }
-        })
-      }
-
       // Validate required fields
-      if (!alertData.posture || !alertData.sector || !alertData.urgency) {
-        throw new Error("Missing required fields: posture, sector, or urgency")
+      if (!title || !description || !sector || !source) {
+        throw new Error("Please fill in all required fields")
       }
 
-      setParsedAlert(alertData)
-      setStatus({
-        type: "success",
-        message: "Alert successfully parsed and ingested.",
-      })
+      // Create new alert
+      const newAlert: AlertType = {
+        id: `manual-${Date.now()}`,
+        title,
+        description,
+        date: new Date().toISOString(),
+        sector,
+        urgency,
+        posture: urgency === "Critical" || urgency === "High" ? "Elevated" : "Guarded",
+        kev,
+        exploitation,
+        criticalInfrastructure,
+        source,
+      }
 
-      // Pass the alert to the parent component
-      onAlertIngested(alertData)
+      // Simulate API submission
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      onAlertSubmitted(newAlert)
+      setSubmitResult("✅ Alert submitted successfully!")
+
+      // Reset form
+      setTitle("")
+      setDescription("")
+      setSector("")
+      setUrgency("Medium")
+      setSource("")
+      setKev(false)
+      setExploitation(false)
+      setCriticalInfrastructure(false)
     } catch (error) {
-      setStatus({
-        type: "error",
-        message: `Failed to parse alert: ${(error as Error).message}`,
-      })
-      setParsedAlert(null)
+      setSubmitResult(`❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
+  const sectors = [
+    "Energy",
+    "Healthcare",
+    "Finance",
+    "Transportation",
+    "Water",
+    "Communications",
+    "Defense",
+    "Manufacturing",
+    "Food & Agriculture",
+    "Government",
+    "Emergency Services",
+    "Nuclear",
+    "Dams",
+    "Chemical",
+    "Commercial Facilities",
+    "IT",
+  ]
+
   return (
-    <Card className="border-[#005288] border-t-4">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-[#005288]">Manual Alert Ingestion</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Manual Alert Ingestion
+        </CardTitle>
         <CardDescription>
-          Paste a JSON-formatted alert or use simplified format (e.g., posture: Shields Up, sector: Energy)
+          Submit threat intelligence alerts manually for immediate CAPRI score calculation
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <Textarea
-            placeholder="Paste alert data here..."
-            className="min-h-[200px] font-mono text-sm border-2"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-          />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Alert Title <span className="text-red-500">*</span>
+            </label>
+            <Input
+              placeholder="Enter alert title..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
 
-          <Button onClick={handleIngest} className="w-full bg-[#005288] hover:bg-[#003e66]">
-            Ingest Alert
-          </Button>
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Description <span className="text-red-500">*</span>
+            </label>
+            <Textarea
+              placeholder="Detailed description of the threat or vulnerability..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              required
+            />
+          </div>
 
-          {status.type && (
-            <Alert variant={status.type === "error" ? "destructive" : "default"}>
-              {status.type === "error" ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-              <AlertTitle>{status.type === "error" ? "Error" : "Success"}</AlertTitle>
-              <AlertDescription>{status.message}</AlertDescription>
+          {/* Sector and Urgency */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Sector <span className="text-red-500">*</span>
+              </label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                required
+              >
+                <option value="">Select sector...</option>
+                {sectors.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Urgency Level</label>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={urgency}
+                onChange={(e) => setUrgency(e.target.value as any)}
+              >
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Source */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Source <span className="text-red-500">*</span>
+            </label>
+            <Input
+              placeholder="e.g., Internal SOC, Vendor Alert, Open Source Intelligence"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              required
+            />
+          </div>
+
+          {/* Threat Indicators */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Threat Indicators</label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={kev} onChange={(e) => setKev(e.target.checked)} className="rounded" />
+                <span className="text-sm">Known Exploited Vulnerability (KEV)</span>
+                <Badge variant="outline" className="text-xs">
+                  CISA KEV Catalog
+                </Badge>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={exploitation}
+                  onChange={(e) => setExploitation(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm">Active Exploitation Observed</span>
+                <Badge variant="outline" className="text-xs">
+                  In-the-wild
+                </Badge>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={criticalInfrastructure}
+                  onChange={(e) => setCriticalInfrastructure(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm">Critical Infrastructure Impact</span>
+                <Badge variant="outline" className="text-xs">
+                  CI Sectors
+                </Badge>
+              </label>
+            </div>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex gap-2">
+            <Button type="submit" disabled={isSubmitting} className="flex-1">
+              {isSubmitting ? (
+                <>
+                  <AlertTriangle className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Submit Alert
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setTitle("")
+                setDescription("")
+                setSector("")
+                setUrgency("Medium")
+                setSource("")
+                setKev(false)
+                setExploitation(false)
+                setCriticalInfrastructure(false)
+                setSubmitResult(null)
+              }}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Clear
+            </Button>
+          </div>
+
+          {/* Result Message */}
+          {submitResult && (
+            <Alert>
+              {submitResult.includes("✅") ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <AlertTriangle className="h-4 w-4" />
+              )}
+              <AlertDescription>{submitResult}</AlertDescription>
             </Alert>
           )}
-
-          {parsedAlert && (
-            <div className="mt-4 border rounded-md p-4 bg-gray-50">
-              <h3 className="font-medium text-lg mb-2">Alert Breakdown</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="font-medium">Posture:</div>
-                <div>{parsedAlert.posture}</div>
-
-                <div className="font-medium">Sector:</div>
-                <div>{parsedAlert.sector}</div>
-
-                <div className="font-medium">Urgency:</div>
-                <div
-                  className={`font-medium ${
-                    parsedAlert.urgency === "High"
-                      ? "text-[#d92525]"
-                      : parsedAlert.urgency === "Medium"
-                        ? "text-amber-500"
-                        : "text-green-600"
-                  }`}
-                >
-                  {parsedAlert.urgency}
-                </div>
-
-                <div className="font-medium">KEV Present:</div>
-                <div>{parsedAlert.kev ? "Yes" : "No"}</div>
-
-                <div className="font-medium">Exploitation Observed:</div>
-                <div>{parsedAlert.exploitation ? "Yes" : "No"}</div>
-
-                <div className="font-medium">Critical Infrastructure:</div>
-                <div>{parsedAlert.criticalInfrastructure ? "Yes" : "No"}</div>
-              </div>
-            </div>
-          )}
-        </div>
+        </form>
       </CardContent>
     </Card>
   )

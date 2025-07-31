@@ -1,624 +1,659 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Progress } from "@/components/ui/progress"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  Database,
   Search,
-  Filter,
+  Database,
+  Shield,
+  AlertTriangle,
+  Clock,
   Download,
   Eye,
-  AlertTriangle,
-  Shield,
-  Target,
-  Activity,
+  Filter,
+  Hash,
+  Globe,
+  Mail,
   FileText,
-  Zap,
-  Clock,
-  ExternalLink,
+  Activity,
+  TrendingUp,
+  BarChart3,
 } from "lucide-react"
-import type { Alert } from "@/types/alert"
-import { generateSampleAlerts, generateHistoricalData, generateThreatPredictions } from "@/lib/sample-data"
-
-interface DatabaseViewProps {
-  alerts: Alert[]
-  sectorScores: any[]
-}
+import { getAllRealThreatIntel } from "@/lib/real-ti-data"
 
 interface DatabaseRecord {
   id: string
-  timestamp: string
-  type: "alert" | "threat_intel" | "vulnerability" | "incident" | "ioc" | "capri_score"
-  severity: "Low" | "Medium" | "High" | "Critical"
-  source: string
+  type: "vulnerability" | "ioc" | "threat_intel" | "alert"
   title: string
-  sector: string
-  status: "Active" | "Resolved" | "Investigating" | "Archived"
+  description: string
+  severity: "Critical" | "High" | "Medium" | "Low"
+  source: string
+  timestamp: string
+  indicators?: {
+    type: string
+    value: string
+    confidence: number
+  }[]
+  sectors: string[]
   tags: string[]
-  data: any
+  mitreTechniques?: string[]
+  tlp?: string
 }
 
-export function DatabaseView({ alerts, sectorScores }: DatabaseViewProps) {
+export function DatabaseView() {
+  const [records, setRecords] = useState<DatabaseRecord[]>([])
+  const [filteredRecords, setFilteredRecords] = useState<DatabaseRecord[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedType, setSelectedType] = useState<string>("all")
-  const [selectedSeverity, setSelectedSeverity] = useState<string>("all")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [severityFilter, setSeverityFilter] = useState("all")
+  const [sourceFilter, setSourceFilter] = useState("all")
   const [selectedRecord, setSelectedRecord] = useState<DatabaseRecord | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const recordsPerPage = 50
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  // Generate comprehensive database records
-  const databaseRecords = useMemo<DatabaseRecord[]>(() => {
-    const records: DatabaseRecord[] = []
-    const sampleAlerts = generateSampleAlerts()
-    const allAlerts = [...alerts, ...sampleAlerts]
-    const threatPredictions = generateThreatPredictions()
-    const historicalData = generateHistoricalData(30)
+  // Load and transform threat intelligence data into database records
+  useEffect(() => {
+    const threatIntel = getAllRealThreatIntel()
+    const transformedRecords: DatabaseRecord[] = threatIntel.map((intel) => ({
+      id: intel.id,
+      type: intel.id.startsWith("CVE-")
+        ? "vulnerability"
+        : intel.id.startsWith("KEV-")
+          ? "vulnerability"
+          : intel.id.startsWith("APT-") || intel.id.startsWith("RANSOM-") || intel.id.startsWith("SUPPLY-")
+            ? "threat_intel"
+            : "alert",
+      title: intel.title,
+      description: intel.description,
+      severity: intel.severity,
+      source: intel.source,
+      timestamp: intel.published,
+      indicators: intel.indicators,
+      sectors: intel.sectors,
+      tags: intel.tags,
+      mitreTechniques: intel.mitreTechniques,
+      tlp: intel.tlp,
+    }))
 
-    // Convert alerts to database records
-    allAlerts.forEach((alert) => {
-      records.push({
-        id: alert.id,
-        timestamp: alert.date,
-        type: "alert",
-        severity: alert.urgency,
-        source: alert.source || "CISA RSS",
-        title: alert.title,
-        sector: alert.sector,
-        status: "Active",
-        tags: [
-          alert.posture,
-          ...(alert.kev ? ["KEV"] : []),
-          ...(alert.exploitation ? ["Active Exploitation"] : []),
-          ...(alert.criticalInfrastructure ? ["Critical Infrastructure"] : []),
-        ],
-        data: alert,
-      })
-    })
-
-    // Add threat intelligence records
-    const threatIntelSources = [
-      "Mandiant Threat Intelligence",
-      "CrowdStrike Intelligence",
-      "Microsoft Security Blog",
-      "Palo Alto Unit 42",
-      "Recorded Future",
-      "Wiz Security Research",
+    // Add some sample IOC records
+    const iocRecords: DatabaseRecord[] = [
+      {
+        id: "ioc-001",
+        type: "ioc",
+        title: "Malicious Domain - ransomhub-support.onion",
+        description: "Domain associated with RansomHub ransomware operations",
+        severity: "High",
+        source: "Internal Analysis",
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        indicators: [{ type: "domain", value: "ransomhub-support.onion", confidence: 95 }],
+        sectors: ["All Sectors"],
+        tags: ["RansomHub", "Ransomware", "Dark Web"],
+      },
+      {
+        id: "ioc-002",
+        type: "ioc",
+        title: "Suspicious IP Address - 185.159.158.241",
+        description: "IP address linked to APT29 command and control infrastructure",
+        severity: "Critical",
+        source: "Threat Intelligence",
+        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+        indicators: [{ type: "ip", value: "185.159.158.241", confidence: 88 }],
+        sectors: ["Government", "Technology"],
+        tags: ["APT29", "C2", "Russia"],
+      },
+      {
+        id: "ioc-003",
+        type: "ioc",
+        title: "Malware Hash - e5f6a7b8c9d0123456789012345678901234abcd",
+        description: "SHA-1 hash of RansomHub ransomware payload",
+        severity: "Critical",
+        source: "Malware Analysis",
+        timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+        indicators: [{ type: "hash", value: "e5f6a7b8c9d0123456789012345678901234abcd", confidence: 95 }],
+        sectors: ["All Sectors"],
+        tags: ["RansomHub", "Malware", "Encryption"],
+      },
     ]
 
-    for (let i = 0; i < 25; i++) {
-      const timestamp = new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString()
-      const source = threatIntelSources[Math.floor(Math.random() * threatIntelSources.length)]
-      const sectors = ["Energy", "Healthcare", "Finance", "Transportation", "Defense"]
-      const sector = sectors[Math.floor(Math.random() * sectors.length)]
+    const allRecords = [...transformedRecords, ...iocRecords]
+    setRecords(allRecords)
+    setFilteredRecords(allRecords)
+  }, [])
 
-      records.push({
-        id: `ti-${i + 1}`,
-        timestamp,
-        type: "threat_intel",
-        severity: ["High", "Medium", "Low"][Math.floor(Math.random() * 3)] as any,
-        source,
-        title: `Threat Intelligence Report ${i + 1}`,
-        sector,
-        status: "Active",
-        tags: ["APT", "Malware", "IOC", "TTP"],
-        data: {
-          indicators: Math.floor(Math.random() * 50) + 10,
-          confidence: Math.floor(Math.random() * 40) + 60,
-          attribution: ["APT29", "Lazarus", "APT40", "FIN7"][Math.floor(Math.random() * 4)],
-        },
-      })
+  // Filter records
+  useEffect(() => {
+    let filtered = records
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (record) =>
+          record.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          record.indicators?.some((indicator) => indicator.value.toLowerCase().includes(searchTerm.toLowerCase())),
+      )
     }
 
-    // Add vulnerability records
-    for (let i = 0; i < 30; i++) {
-      const timestamp = new Date(Date.now() - Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString()
-      const cveId = `CVE-2024-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`
-
-      records.push({
-        id: `vuln-${i + 1}`,
-        timestamp,
-        type: "vulnerability",
-        severity: ["Critical", "High", "Medium", "Low"][Math.floor(Math.random() * 4)] as any,
-        source: "NVD/MITRE",
-        title: `${cveId} - Critical Vulnerability Disclosure`,
-        sector: "All Sectors",
-        status: Math.random() > 0.3 ? "Active" : "Resolved",
-        tags: ["CVE", "Zero-day", "RCE", "Privilege Escalation"],
-        data: {
-          cvss: (Math.random() * 4 + 6).toFixed(1),
-          cwe: `CWE-${Math.floor(Math.random() * 900) + 100}`,
-          exploitAvailable: Math.random() > 0.7,
-        },
-      })
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((record) => record.type === typeFilter)
     }
 
-    // Add incident records
-    for (let i = 0; i < 15; i++) {
-      const timestamp = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
-      const sectors = ["Energy", "Healthcare", "Finance", "Transportation", "Defense"]
-      const sector = sectors[Math.floor(Math.random() * sectors.length)]
-
-      records.push({
-        id: `inc-${i + 1}`,
-        timestamp,
-        type: "incident",
-        severity: ["Critical", "High", "Medium"][Math.floor(Math.random() * 3)] as any,
-        source: "SOC Team",
-        title: `Security Incident ${i + 1} - ${sector} Sector`,
-        sector,
-        status: ["Investigating", "Resolved", "Active"][Math.floor(Math.random() * 3)] as any,
-        tags: ["Breach", "Malware", "Data Exfiltration", "Ransomware"],
-        data: {
-          affectedSystems: Math.floor(Math.random() * 100) + 5,
-          containmentTime: `${Math.floor(Math.random() * 24) + 1} hours`,
-          impactLevel: ["Low", "Medium", "High"][Math.floor(Math.random() * 3)],
-        },
-      })
+    if (severityFilter !== "all") {
+      filtered = filtered.filter((record) => record.severity === severityFilter)
     }
 
-    // Add IOC records
-    for (let i = 0; i < 40; i++) {
-      const timestamp = new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString()
-      const iocTypes = ["IP Address", "Domain", "File Hash", "URL", "Email"]
-      const iocType = iocTypes[Math.floor(Math.random() * iocTypes.length)]
-
-      records.push({
-        id: `ioc-${i + 1}`,
-        timestamp,
-        type: "ioc",
-        severity: ["High", "Medium", "Low"][Math.floor(Math.random() * 3)] as any,
-        source: "Threat Intel Feeds",
-        title: `IOC Detection - ${iocType}`,
-        sector: "All Sectors",
-        status: "Active",
-        tags: ["IOC", "Malicious", iocType.replace(" ", "")],
-        data: {
-          type: iocType,
-          confidence: Math.floor(Math.random() * 40) + 60,
-          firstSeen: timestamp,
-          tlp: ["WHITE", "GREEN", "AMBER"][Math.floor(Math.random() * 3)],
-        },
-      })
+    if (sourceFilter !== "all") {
+      filtered = filtered.filter((record) => record.source === sourceFilter)
     }
 
-    // Add CAPRI score records
-    historicalData.forEach((point, index) => {
-      records.push({
-        id: `capri-${index}`,
-        timestamp: new Date(point.date).toISOString(),
-        type: "capri_score",
-        severity: point.score >= 4 ? "Critical" : point.score >= 3 ? "High" : "Medium",
-        source: "CAPRI Calculator",
-        title: `CAPRI Score Update - ${point.score.toFixed(1)}`,
-        sector: "All Sectors",
-        status: "Active",
-        tags: ["CAPRI", "Score", "Analysis"],
-        data: {
-          score: point.score,
-          alerts: point.alerts,
-          sectors: point.sectors,
-        },
-      })
-    })
-
-    return records.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }, [alerts, sectorScores])
-
-  // Filter records based on search and filters
-  const filteredRecords = useMemo(() => {
-    return databaseRecords.filter((record) => {
-      const matchesSearch =
-        searchTerm === "" ||
-        record.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        record.source.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        record.sector.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        record.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-
-      const matchesType = selectedType === "all" || record.type === selectedType
-      const matchesSeverity = selectedSeverity === "all" || record.severity === selectedSeverity
-
-      return matchesSearch && matchesType && matchesSeverity
-    })
-  }, [databaseRecords, searchTerm, selectedType, selectedSeverity])
-
-  // Pagination
-  const totalPages = Math.ceil(filteredRecords.length / recordsPerPage)
-  const paginatedRecords = filteredRecords.slice((currentPage - 1) * recordsPerPage, currentPage * recordsPerPage)
+    setFilteredRecords(filtered)
+  }, [records, searchTerm, typeFilter, severityFilter, sourceFilter])
 
   const getTypeIcon = (type: string) => {
     switch (type) {
+      case "vulnerability":
+        return <Shield className="h-4 w-4" />
+      case "ioc":
+        return <Hash className="h-4 w-4" />
+      case "threat_intel":
+        return <Activity className="h-4 w-4" />
       case "alert":
         return <AlertTriangle className="h-4 w-4" />
-      case "threat_intel":
-        return <Shield className="h-4 w-4" />
-      case "vulnerability":
-        return <Target className="h-4 w-4" />
-      case "incident":
-        return <Activity className="h-4 w-4" />
-      case "ioc":
-        return <Zap className="h-4 w-4" />
-      case "capri_score":
-        return <FileText className="h-4 w-4" />
       default:
         return <Database className="h-4 w-4" />
+    }
+  }
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case "vulnerability":
+        return "bg-red-100 text-red-800"
+      case "ioc":
+        return "bg-orange-100 text-orange-800"
+      case "threat_intel":
+        return "bg-blue-100 text-blue-800"
+      case "alert":
+        return "bg-yellow-100 text-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
   }
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "Critical":
-        return "bg-red-500 text-white"
+        return "bg-red-500"
       case "High":
-        return "bg-orange-500 text-white"
+        return "bg-orange-500"
       case "Medium":
-        return "bg-yellow-500 text-white"
+        return "bg-yellow-500"
       case "Low":
-        return "bg-green-500 text-white"
+        return "bg-blue-500"
       default:
-        return "bg-gray-500 text-white"
+        return "bg-gray-500"
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Active":
-        return "bg-red-100 text-red-800"
-      case "Investigating":
-        return "bg-yellow-100 text-yellow-800"
-      case "Resolved":
-        return "bg-green-100 text-green-800"
-      case "Archived":
-        return "bg-gray-100 text-gray-800"
+  const getIndicatorIcon = (type: string) => {
+    switch (type) {
+      case "ip":
+        return <Globe className="h-3 w-3" />
+      case "domain":
+        return <Globe className="h-3 w-3" />
+      case "hash":
+        return <Hash className="h-3 w-3" />
+      case "email":
+        return <Mail className="h-3 w-3" />
+      case "cve":
+        return <Shield className="h-3 w-3" />
       default:
-        return "bg-blue-100 text-blue-800"
+        return <FileText className="h-3 w-3" />
     }
   }
+
+  const exportRecord = (record: DatabaseRecord) => {
+    const dataStr = JSON.stringify(record, null, 2)
+    const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr)
+    const exportFileDefaultName = `${record.type}_${record.id}.json`
+
+    const linkElement = document.createElement("a")
+    linkElement.setAttribute("href", dataUri)
+    linkElement.setAttribute("download", exportFileDefaultName)
+    linkElement.click()
+  }
+
+  const getStatistics = () => {
+    const total = records.length
+    const vulnerabilities = records.filter((r) => r.type === "vulnerability").length
+    const iocs = records.filter((r) => r.type === "ioc").length
+    const threatIntel = records.filter((r) => r.type === "threat_intel").length
+    const critical = records.filter((r) => r.severity === "Critical").length
+
+    return { total, vulnerabilities, iocs, threatIntel, critical }
+  }
+
+  const stats = getStatistics()
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-[#005288] flex items-center gap-2">
-            <Database className="h-6 w-6" />
-            Intelligence Database
-          </h2>
-          <p className="text-gray-600">Comprehensive view of all threat intelligence, alerts, and security data</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-1" />
-            Export Data
-          </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-1" />
-            Advanced Filter
-          </Button>
+          <h2 className="text-3xl font-bold tracking-tight">Database View</h2>
+          <p className="text-muted-foreground">
+            Comprehensive database of vulnerabilities, IOCs, and threat intelligence
+          </p>
         </div>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        {[
-          {
-            type: "alert",
-            label: "Alerts",
-            count: databaseRecords.filter((r) => r.type === "alert").length,
-            color: "text-red-600",
-          },
-          {
-            type: "threat_intel",
-            label: "Threat Intel",
-            count: databaseRecords.filter((r) => r.type === "threat_intel").length,
-            color: "text-purple-600",
-          },
-          {
-            type: "vulnerability",
-            label: "Vulnerabilities",
-            count: databaseRecords.filter((r) => r.type === "vulnerability").length,
-            color: "text-orange-600",
-          },
-          {
-            type: "incident",
-            label: "Incidents",
-            count: databaseRecords.filter((r) => r.type === "incident").length,
-            color: "text-blue-600",
-          },
-          {
-            type: "ioc",
-            label: "IOCs",
-            count: databaseRecords.filter((r) => r.type === "ioc").length,
-            color: "text-green-600",
-          },
-          {
-            type: "capri_score",
-            label: "CAPRI Scores",
-            count: databaseRecords.filter((r) => r.type === "capri_score").length,
-            color: "text-indigo-600",
-          },
-        ].map((stat) => (
-          <Card
-            key={stat.type}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setSelectedType(stat.type)}
-          >
-            <CardContent className="p-4 text-center">
-              <div className={`text-2xl font-bold ${stat.color}`}>{stat.count}</div>
-              <div className="text-sm text-gray-600">{stat.label}</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+            <Database className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">Database entries</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vulnerabilities</CardTitle>
+            <Shield className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.vulnerabilities}</div>
+            <p className="text-xs text-muted-foreground">CVEs and security flaws</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">IOCs</CardTitle>
+            <Hash className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.iocs}</div>
+            <p className="text-xs text-muted-foreground">Indicators of compromise</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Threat Intel</CardTitle>
+            <Activity className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.threatIntel}</div>
+            <p className="text-xs text-muted-foreground">Intelligence reports</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Critical</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats.critical}</div>
+            <p className="text-xs text-muted-foreground">High priority items</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search alerts, sources, sectors, tags..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="px-3 py-2 border rounded-md text-sm"
-              >
-                <option value="all">All Types</option>
-                <option value="alert">Alerts</option>
-                <option value="threat_intel">Threat Intel</option>
-                <option value="vulnerability">Vulnerabilities</option>
-                <option value="incident">Incidents</option>
-                <option value="ioc">IOCs</option>
-                <option value="capri_score">CAPRI Scores</option>
-              </select>
-              <select
-                value={selectedSeverity}
-                onChange={(e) => setSelectedSeverity(e.target.value)}
-                className="px-3 py-2 border rounded-md text-sm"
-              >
-                <option value="all">All Severities</option>
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Database Table */}
-      <Tabs defaultValue="table" className="w-full">
+      <Tabs defaultValue="records" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="table">Table View</TabsTrigger>
-          <TabsTrigger value="details">Record Details</TabsTrigger>
+          <TabsTrigger value="records">Database Records</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="table">
+        <TabsContent value="records" className="space-y-4">
+          {/* Filters */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Database Records ({filteredRecords.length.toLocaleString()})</span>
-                <div className="text-sm text-gray-600">
-                  Page {currentPage} of {totalPages}
-                </div>
-              </CardTitle>
+              <CardTitle className="text-lg">Search & Filters</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search records..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Record Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="vulnerability">Vulnerabilities</SelectItem>
+                    <SelectItem value="ioc">IOCs</SelectItem>
+                    <SelectItem value="threat_intel">Threat Intel</SelectItem>
+                    <SelectItem value="alert">Alerts</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={severityFilter} onValueChange={setSeverityFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Severities</SelectItem>
+                    <SelectItem value="Critical">Critical</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="Low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sources</SelectItem>
+                    {Array.from(new Set(records.map((r) => r.source))).map((source) => (
+                      <SelectItem key={source} value={source}>
+                        {source}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm("")
+                    setTypeFilter("all")
+                    setSeverityFilter("all")
+                    setSourceFilter("all")
+                  }}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Records Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Database Records ({filteredRecords.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[600px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Type</TableHead>
-                      <TableHead>Timestamp</TableHead>
                       <TableHead>Title</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Sector</TableHead>
                       <TableHead>Severity</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Tags</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Timestamp</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedRecords.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-gray-50">
+                    {filteredRecords.map((record) => (
+                      <TableRow key={record.id}>
                         <TableCell>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center space-x-2">
                             {getTypeIcon(record.type)}
-                            <span className="text-sm capitalize">{record.type.replace("_", " ")}</span>
+                            <Badge className={getTypeColor(record.type)}>
+                              {record.type.replace("_", " ").toUpperCase()}
+                            </Badge>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1 text-sm">
+                          <div className="max-w-[300px]">
+                            <p className="font-medium truncate">{record.title}</p>
+                            <p className="text-sm text-muted-foreground truncate">{record.description}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${getSeverityColor(record.severity)} text-white`}>{record.severity}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{record.source}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                             <Clock className="h-3 w-3" />
-                            {new Date(record.timestamp).toLocaleString()}
+                            <span>{new Date(record.timestamp).toLocaleDateString()}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="max-w-xs truncate font-medium">{record.title}</div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {record.source}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">{record.sector}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getSeverityColor(record.severity)}>{record.severity}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={getStatusColor(record.status)}>
-                            {record.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1 max-w-xs">
-                            {record.tags.slice(0, 2).map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                            {record.tags.length > 2 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{record.tags.length - 2}
-                              </Badge>
-                            )}
+                          <div className="flex items-center space-x-2">
+                            <Dialog
+                              open={isDialogOpen && selectedRecord?.id === record.id}
+                              onOpenChange={(open) => {
+                                setIsDialogOpen(open)
+                                if (!open) setSelectedRecord(null)
+                              }}
+                            >
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedRecord(record)
+                                    setIsDialogOpen(true)
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle className="flex items-center space-x-2">
+                                    {getTypeIcon(record.type)}
+                                    <span>{record.title}</span>
+                                    <Badge className={`${getSeverityColor(record.severity)} text-white`}>
+                                      {record.severity}
+                                    </Badge>
+                                  </DialogTitle>
+                                  <DialogDescription>Detailed view of database record {record.id}</DialogDescription>
+                                </DialogHeader>
+
+                                {selectedRecord && (
+                                  <div className="space-y-6">
+                                    {/* Basic Information */}
+                                    <div>
+                                      <h4 className="font-medium mb-2">Description</h4>
+                                      <p className="text-sm text-muted-foreground">{selectedRecord.description}</p>
+                                    </div>
+
+                                    {/* Metadata */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <h4 className="font-medium mb-2">Source</h4>
+                                        <p className="text-sm">{selectedRecord.source}</p>
+                                      </div>
+                                      <div>
+                                        <h4 className="font-medium mb-2">Timestamp</h4>
+                                        <p className="text-sm">{new Date(selectedRecord.timestamp).toLocaleString()}</p>
+                                      </div>
+                                    </div>
+
+                                    {/* Indicators */}
+                                    {selectedRecord.indicators && selectedRecord.indicators.length > 0 && (
+                                      <div>
+                                        <h4 className="font-medium mb-2">Indicators of Compromise</h4>
+                                        <div className="space-y-2">
+                                          {selectedRecord.indicators.map((indicator, idx) => (
+                                            <div
+                                              key={idx}
+                                              className="flex items-center justify-between p-3 border rounded-lg"
+                                            >
+                                              <div className="flex items-center space-x-3">
+                                                {getIndicatorIcon(indicator.type)}
+                                                <div>
+                                                  <Badge variant="outline" className="text-xs mb-1">
+                                                    {indicator.type.toUpperCase()}
+                                                  </Badge>
+                                                  <p className="text-sm font-mono">{indicator.value}</p>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center space-x-2">
+                                                <span className="text-xs text-muted-foreground">
+                                                  {indicator.confidence}% confidence
+                                                </span>
+                                                <Progress value={indicator.confidence} className="w-20 h-2" />
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* MITRE Techniques */}
+                                    {selectedRecord.mitreTechniques && selectedRecord.mitreTechniques.length > 0 && (
+                                      <div>
+                                        <h4 className="font-medium mb-2">MITRE ATT&CK Techniques</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                          {selectedRecord.mitreTechniques.map((technique) => (
+                                            <Badge key={technique} variant="outline">
+                                              {technique}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Sectors */}
+                                    <div>
+                                      <h4 className="font-medium mb-2">Affected Sectors</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {selectedRecord.sectors.map((sector) => (
+                                          <Badge key={sector} variant="secondary">
+                                            {sector}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Tags */}
+                                    <div>
+                                      <h4 className="font-medium mb-2">Tags</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {selectedRecord.tags.map((tag) => (
+                                          <Badge key={tag} variant="outline">
+                                            {tag}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* TLP Classification */}
+                                    {selectedRecord.tlp && (
+                                      <div>
+                                        <h4 className="font-medium mb-2">Traffic Light Protocol</h4>
+                                        <Badge variant="outline">TLP:{selectedRecord.tlp}</Badge>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+
+                            <Button variant="ghost" size="sm" onClick={() => exportRecord(record)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline" onClick={() => setSelectedRecord(record)}>
-                            <Eye className="h-3 w-3" />
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </div>
-
-              {/* Pagination */}
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-gray-600">
-                  Showing {(currentPage - 1) * recordsPerPage + 1} to{" "}
-                  {Math.min(currentPage * recordsPerPage, filteredRecords.length)} of {filteredRecords.length} records
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="details">
-          <Card>
-            <CardHeader>
-              <CardTitle>Record Details</CardTitle>
-              <CardDescription>
-                {selectedRecord
-                  ? `Viewing details for ${selectedRecord.id}`
-                  : "Select a record from the table to view details"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {selectedRecord ? (
-                <div className="space-y-6">
-                  {/* Record Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold flex items-center gap-2">
-                        {getTypeIcon(selectedRecord.type)}
-                        {selectedRecord.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">ID: {selectedRecord.id}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge className={getSeverityColor(selectedRecord.severity)}>{selectedRecord.severity}</Badge>
-                      <Badge variant="outline" className={getStatusColor(selectedRecord.status)}>
-                        {selectedRecord.status}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Record Metadata */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium mb-2">Metadata</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Timestamp:</span>
-                          <span>{new Date(selectedRecord.timestamp).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Source:</span>
-                          <span>{selectedRecord.source}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Sector:</span>
-                          <span>{selectedRecord.sector}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Type:</span>
-                          <span className="capitalize">{selectedRecord.type.replace("_", " ")}</span>
-                        </div>
+        <TabsContent value="analytics" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5" />
+                  <span>Record Types Distribution</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { type: "vulnerability", count: stats.vulnerabilities, color: "bg-red-500" },
+                    { type: "ioc", count: stats.iocs, color: "bg-orange-500" },
+                    { type: "threat_intel", count: stats.threatIntel, color: "bg-blue-500" },
+                  ].map((item) => (
+                    <div key={item.type} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-3 h-3 rounded ${item.color}`} />
+                        <span className="capitalize">{item.type.replace("_", " ")}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium">{item.count}</span>
+                        <Progress value={(item.count / stats.total) * 100} className="w-20 h-2" />
                       </div>
                     </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-                    <div>
-                      <h4 className="font-medium mb-2">Tags</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedRecord.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="h-5 w-5" />
+                  <span>Severity Distribution</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {["Critical", "High", "Medium", "Low"].map((severity) => {
+                    const count = records.filter((r) => r.severity === severity).length
+                    const color = getSeverityColor(severity)
+                    return (
+                      <div key={severity} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-3 h-3 rounded ${color}`} />
+                          <span>{severity}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium">{count}</span>
+                          <Progress value={(count / stats.total) * 100} className="w-20 h-2" />
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Record Data */}
-                  <div>
-                    <h4 className="font-medium mb-2">Raw Data</h4>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <pre className="text-xs overflow-x-auto">{JSON.stringify(selectedRecord.data, null, 2)}</pre>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline">
-                      <ExternalLink className="h-3 w-3 mr-1" />
-                      View Source
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Download className="h-3 w-3 mr-1" />
-                      Export Record
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <FileText className="h-3 w-3 mr-1" />
-                      Generate Report
-                    </Button>
-                  </div>
+                    )
+                  })}
                 </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Select a record from the table to view detailed information</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

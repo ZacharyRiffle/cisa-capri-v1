@@ -1,600 +1,677 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-import { Settings, Zap, CheckCircle2, XCircle, AlertTriangle, Send, Database, Webhook, Key, Globe } from "lucide-react"
-import type { Alert } from "@/types/alert"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Database,
+  Settings,
+  Zap,
+  CheckCircle,
+  AlertTriangle,
+  ExternalLink,
+  Copy,
+  Download,
+  Play,
+  RefreshCw,
+  Code,
+  Globe,
+  Shield,
+  Activity,
+} from "lucide-react"
+import type { Alert as AlertType } from "@/types/alert"
 
 interface SiemIntegrationProps {
-  alerts: Alert[]
-  onWebhookSend?: (data: any) => void
+  alerts: AlertType[]
 }
 
-interface SiemConnection {
+interface Integration {
   id: string
   name: string
-  type: "splunk" | "qradar" | "sentinel" | "elastic" | "chronicle"
-  status: "connected" | "disconnected" | "error"
+  type: "SIEM" | "SOAR" | "EDR" | "Cloud" | "Threat Intel" | "Network"
+  status: "Connected" | "Disconnected" | "Error" | "Configuring" | "Not Connected"
+  description: string
   endpoint: string
-  lastSync: string
-  alertsSent: number
-  enabled: boolean
-}
-
-interface WebhookConfig {
-  url: string
-  method: "POST" | "PUT"
-  headers: Record<string, string>
-  enabled: boolean
-  events: string[]
+  apiKey?: string
+  lastSync?: string
+  alertsIngested: number
+  configuration: Record<string, any>
 }
 
 interface ApiEndpoint {
-  path: string
   method: "GET" | "POST" | "PUT" | "DELETE"
+  path: string
   description: string
-  authenticated: boolean
+  parameters?: Record<string, string>
+  example: string
 }
 
-export function SiemIntegration({ alerts, onWebhookSend }: SiemIntegrationProps) {
-  const [siemConnections, setSiemConnections] = useState<SiemConnection[]>([
-    {
-      id: "splunk-prod",
-      name: "Splunk Enterprise",
-      type: "splunk",
-      status: "connected",
-      endpoint: "https://splunk.company.com:8089",
-      lastSync: "2 minutes ago",
-      alertsSent: 1247,
-      enabled: true,
-    },
-    {
-      id: "sentinel-main",
-      name: "Microsoft Sentinel",
-      type: "sentinel",
-      status: "connected",
-      endpoint: "https://company.sentinel.azure.com",
-      lastSync: "5 minutes ago",
-      alertsSent: 892,
-      enabled: true,
-    },
-    {
-      id: "qradar-soc",
-      name: "IBM QRadar",
-      type: "qradar",
-      status: "error",
-      endpoint: "https://qradar.company.com",
-      lastSync: "2 hours ago",
-      alertsSent: 0,
-      enabled: false,
-    },
-  ])
+export function SiemIntegration({ alerts }: SiemIntegrationProps) {
+  const [selectedIntegration, setSelectedIntegration] = useState<string>("splunk")
+  const [apiKey, setApiKey] = useState("")
+  const [endpoint, setEndpoint] = useState("")
+  const [testResult, setTestResult] = useState<string | null>(null)
 
-  const [webhookConfig, setWebhookConfig] = useState<WebhookConfig>({
-    url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer YOUR_TOKEN",
-    },
-    enabled: true,
-    events: ["high_severity_alert", "capri_score_change", "new_threat_detected"],
-  })
-
-  const [apiKey, setApiKey] = useState("capri_api_key_" + Math.random().toString(36).substr(2, 9))
-
-  const apiEndpoints: ApiEndpoint[] = [
-    {
-      path: "/api/v1/alerts",
-      method: "GET",
-      description: "Retrieve all alerts with optional filtering",
-      authenticated: true,
-    },
-    {
-      path: "/api/v1/alerts",
-      method: "POST",
-      description: "Create a new alert",
-      authenticated: true,
-    },
-    {
-      path: "/api/v1/capri/scores",
-      method: "GET",
-      description: "Get current CAPRI scores by sector",
-      authenticated: true,
-    },
-    {
-      path: "/api/v1/threats/indicators",
-      method: "GET",
-      description: "Retrieve threat indicators and IOCs",
-      authenticated: true,
-    },
-    {
-      path: "/api/v1/webhooks/test",
-      method: "POST",
-      description: "Test webhook configuration",
-      authenticated: true,
-    },
-  ]
-
-  const handleSiemToggle = (connectionId: string, enabled: boolean) => {
-    setSiemConnections((prev) => prev.map((conn) => (conn.id === connectionId ? { ...conn, enabled } : conn)))
-  }
-
-  const handleTestWebhook = async () => {
-    const testPayload = {
-      event: "test_webhook",
-      timestamp: new Date().toISOString(),
-      data: {
-        message: "CAPRI webhook test successful",
-        capri_score: 3.8,
-        alert_count: alerts.length,
-        test: true,
+  // Mock integrations data
+  const integrations = useMemo<Integration[]>(
+    () => [
+      {
+        id: "splunk",
+        name: "Splunk Enterprise Security",
+        type: "SIEM",
+        status: "Not Connected",
+        description: "Real-time CAPRI score ingestion into Splunk ES for correlation and alerting",
+        endpoint: "https://splunk.company.com:8089/services/collector/event",
+        apiKey: "********-****-****-****-************",
+        lastSync: "2024-01-15T10:30:00Z",
+        alertsIngested: 1247,
+        configuration: {
+          index: "cisa_capri",
+          sourcetype: "capri:alert",
+          host: "cisa-capri-platform",
+          ssl_verify: true,
+          batch_size: 100,
+        },
       },
-    }
+      {
+        id: "sentinel",
+        name: "Microsoft Sentinel",
+        type: "SIEM",
+        status: "Not Connected",
+        description: "Microsoft Sentinel integration for cloud-native security operations",
+        endpoint: "https://company.ods.opinsights.azure.com/api/logs",
+        apiKey: "********-****-****-****-************",
+        lastSync: "2024-01-15T10:25:00Z",
+        alertsIngested: 892,
+        configuration: {
+          workspace_id: "12345678-1234-1234-1234-123456789012",
+          log_type: "CISACapri_CL",
+          time_generated_field: "TimeGenerated",
+        },
+      },
+      {
+        id: "qradar",
+        name: "IBM QRadar",
+        type: "SIEM",
+        status: "Not Connected",
+        description: "QRadar SIEM integration for enterprise security monitoring",
+        endpoint: "https://qradar.company.com/api/ariel/searches",
+        apiKey: "********-****-****-****-************",
+        lastSync: "2024-01-15T10:20:00Z",
+        alertsIngested: 634,
+        configuration: {
+          reference_set: "CISA_CAPRI_Indicators",
+          offense_type: "CAPRI Alert",
+          magnitude: 5,
+          credibility: 8,
+        },
+      },
+      {
+        id: "crowdstrike",
+        name: "CrowdStrike Falcon",
+        type: "EDR",
+        status: "Not Connected",
+        description: "Endpoint detection and response integration for threat hunting",
+        endpoint: "https://api.crowdstrike.com/intel/entities/indicators/v1",
+        apiKey: "********-****-****-****-************",
+        lastSync: "2024-01-15T10:10:00Z",
+        alertsIngested: 423,
+        configuration: {
+          indicator_type: "domain,ip,hash",
+          action: "prevent",
+          platforms: "windows,mac,linux",
+          severity: "high",
+        },
+      },
+    ],
+    [],
+  )
 
-    try {
-      // Simulate webhook call
-      console.log("Sending webhook:", testPayload)
-      onWebhookSend?.(testPayload)
-
-      // Show success feedback
-      alert("Webhook test sent successfully!")
-    } catch (error) {
-      console.error("Webhook test failed:", error)
-      alert("Webhook test failed. Please check your configuration.")
-    }
+  // API endpoints for external integration
+  const apiEndpoints = useMemo<ApiEndpoint[]>(
+    () => [
+      {
+        method: "GET",
+        path: "/api/v1/capri/scores",
+        description: "Get current CAPRI scores by sector",
+        parameters: {
+          sector: "Optional sector filter (Energy, Healthcare, Finance, etc.)",
+          format: "Response format (json, xml, csv)",
+        },
+        example: `{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "overall_score": 3.2,
+  "sectors": {
+    "Energy": {"score": 3.8, "alerts": 45},
+    "Healthcare": {"score": 2.9, "alerts": 23},
+    "Finance": {"score": 3.5, "alerts": 67}
   }
-
-  const handleSiemSync = (connectionId: string) => {
-    setSiemConnections((prev) =>
-      prev.map((conn) =>
-        conn.id === connectionId
-          ? { ...conn, lastSync: "Just now", alertsSent: conn.alertsSent + alerts.length }
-          : conn,
-      ),
-    )
+}`,
+      },
+      {
+        method: "GET",
+        path: "/api/v1/alerts",
+        description: "Retrieve threat intelligence alerts",
+        parameters: {
+          limit: "Number of alerts to return (default: 100)",
+          sector: "Filter by sector",
+          severity: "Filter by severity (Low, Medium, High, Critical)",
+          since: "ISO timestamp for alerts since date",
+        },
+        example: `{
+  "alerts": [
+    {
+      "id": "alert-001",
+      "title": "Critical Vulnerability in Energy Sector",
+      "severity": "High",
+      "sector": "Energy",
+      "timestamp": "2024-01-15T09:45:00Z",
+      "capri_impact": 0.8
+    }
+  ],
+  "total": 1247,
+  "page": 1
+}`,
+      },
+      {
+        method: "POST",
+        path: "/api/v1/indicators",
+        description: "Submit threat indicators to CAPRI",
+        parameters: {
+          type: "Indicator type (ip, domain, hash, url)",
+          value: "Indicator value",
+          confidence: "Confidence level (0-100)",
+          source: "Source of the indicator",
+        },
+        example: `{
+  "indicators": [
+    {
+      "type": "ip",
+      "value": "192.168.1.100",
+      "confidence": 85,
+      "source": "Internal SOC",
+      "tags": ["malware", "c2"]
+    }
+  ]
+}`,
+      },
+      {
+        method: "POST",
+        path: "/api/v1/webhooks",
+        description: "Register webhook for real-time notifications",
+        parameters: {
+          url: "Webhook endpoint URL",
+          events: "Array of events to subscribe to",
+          secret: "Optional webhook secret for verification",
+        },
+        example: `{
+  "webhook": {
+    "url": "https://your-siem.com/webhook/capri",
+    "events": ["alert.created", "score.updated"],
+    "secret": "your-webhook-secret"
   }
+}`,
+      },
+    ],
+    [],
+  )
 
-  const getStatusIcon = (status: SiemConnection["status"]) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "connected":
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />
-      case "error":
-        return <XCircle className="h-4 w-4 text-red-500" />
+      case "Connected":
+        return "text-green-600 bg-green-50"
+      case "Configuring":
+        return "text-yellow-600 bg-yellow-50"
+      case "Error":
+        return "text-red-600 bg-red-50"
+      case "Not Connected":
+        return "text-gray-600 bg-gray-50"
       default:
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
+        return "text-gray-600 bg-gray-50"
     }
   }
 
-  const getSiemIcon = (type: SiemConnection["type"]) => {
-    switch (type) {
-      case "splunk":
-        return <Database className="h-5 w-5 text-green-600" />
-      case "sentinel":
-        return <Database className="h-5 w-5 text-blue-600" />
-      case "qradar":
-        return <Database className="h-5 w-5 text-purple-600" />
-      case "elastic":
-        return <Database className="h-5 w-5 text-yellow-600" />
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Connected":
+        return <CheckCircle className="h-4 w-4 text-green-600" />
+      case "Configuring":
+        return <RefreshCw className="h-4 w-4 text-yellow-600 animate-spin" />
+      case "Error":
+        return <AlertTriangle className="h-4 w-4 text-red-600" />
+      case "Not Connected":
+        return <Database className="h-4 w-4 text-gray-600" />
       default:
-        return <Database className="h-5 w-5 text-gray-600" />
+        return <Database className="h-4 w-4 text-gray-600" />
     }
+  }
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "SIEM":
+        return <Database className="h-4 w-4" />
+      case "SOAR":
+        return <Zap className="h-4 w-4" />
+      case "EDR":
+        return <Shield className="h-4 w-4" />
+      case "Cloud":
+        return <Globe className="h-4 w-4" />
+      case "Threat Intel":
+        return <Activity className="h-4 w-4" />
+      default:
+        return <Settings className="h-4 w-4" />
+    }
+  }
+
+  const handleTestConnection = async () => {
+    setTestResult("Testing connection...")
+    // Simulate API test
+    setTimeout(() => {
+      setTestResult("✅ Connection successful! CAPRI data can be ingested.")
+    }, 2000)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#005288]">SIEM Integration & APIs</h2>
-          <p className="text-gray-600">Connect with external security tools and platforms</p>
+          <h2 className="text-2xl font-bold text-[#005288]">APIs & Integrations</h2>
+          <p className="text-gray-600">Connect CAPRI with your security infrastructure and external systems</p>
         </div>
-        <Button className="bg-[#005288] hover:bg-[#003e66]">
-          <Settings className="h-4 w-4 mr-2" />
-          Configure
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const config = { integrations, apiEndpoints, timestamp: new Date().toISOString() }
+              const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement("a")
+              a.href = url
+              a.download = "capri-integrations-config.json"
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Export Config
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.open("https://docs.cisa-capri.gov/api", "_blank")}>
+            <ExternalLink className="h-4 w-4 mr-1" />
+            API Docs
+          </Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="siem" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="siem">SIEM Connections</TabsTrigger>
-          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+      {/* Integration Status Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Active Integrations</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {integrations.filter((i) => i.status === "Connected").length}
+                </p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Alerts Sent</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {integrations.reduce((sum, i) => sum + i.alertsIngested, 0).toLocaleString()}
+                </p>
+              </div>
+              <Activity className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">API Calls (24h)</p>
+                <p className="text-2xl font-bold text-purple-600">12,847</p>
+              </div>
+              <Zap className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Avg Response Time</p>
+                <p className="text-2xl font-bold text-orange-600">245ms</p>
+              </div>
+              <RefreshCw className="h-8 w-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Integration Interface */}
+      <Tabs defaultValue="integrations" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="integrations">Current Integrations</TabsTrigger>
           <TabsTrigger value="api">API Endpoints</TabsTrigger>
-          <TabsTrigger value="logs">Integration Logs</TabsTrigger>
+          <TabsTrigger value="configure">Configure New</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="siem">
+        <TabsContent value="integrations">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* SIEM Connections */}
-            <div className="space-y-4">
-              {siemConnections.map((connection) => (
-                <Card key={connection.id}>
-                  <CardHeader className="pb-3">
+            {integrations.map((integration) => (
+              <Card key={integration.id}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {getTypeIcon(integration.type)}
+                    <span>{integration.name}</span>
+                    <Badge variant="outline">{integration.type}</Badge>
+                  </CardTitle>
+                  <CardDescription>{integration.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Status */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {getSiemIcon(connection.type)}
-                        <div>
-                          <CardTitle className="text-lg">{connection.name}</CardTitle>
-                          <CardDescription>{connection.endpoint}</CardDescription>
-                        </div>
-                      </div>
                       <div className="flex items-center gap-2">
-                        {getStatusIcon(connection.status)}
-                        <Switch
-                          checked={connection.enabled}
-                          onCheckedChange={(enabled) => handleSiemToggle(connection.id, enabled)}
-                        />
+                        {getStatusIcon(integration.status)}
+                        <span className={`text-sm px-2 py-1 rounded ${getStatusColor(integration.status)}`}>
+                          {integration.status}
+                        </span>
                       </div>
+                      {integration.lastSync && (
+                        <span className="text-xs text-gray-500">
+                          Last sync: {new Date(integration.lastSync).toLocaleString()}
+                        </span>
+                      )}
                     </div>
-                  </CardHeader>
-                  <CardContent>
+
+                    {/* Metrics */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-600">Status:</span>
-                        <Badge
-                          className={`ml-2 ${
-                            connection.status === "connected"
-                              ? "bg-green-100 text-green-800"
-                              : connection.status === "error"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {connection.status}
-                        </Badge>
+                        <span className="text-gray-600">Alerts Ingested:</span>
+                        <span className="font-medium ml-2">{integration.alertsIngested.toLocaleString()}</span>
                       </div>
                       <div>
-                        <span className="text-gray-600">Last Sync:</span>
-                        <span className="ml-2">{connection.lastSync}</span>
+                        <span className="text-gray-600">Endpoint:</span>
+                        <span className="font-mono text-xs ml-2 truncate block">
+                          {integration.endpoint.replace(/https?:\/\//, "")}
+                        </span>
                       </div>
-                      <div>
-                        <span className="text-gray-600">Alerts Sent:</span>
-                        <span className="ml-2 font-medium">{connection.alertsSent.toLocaleString()}</span>
+                    </div>
+
+                    {/* Configuration */}
+                    <div>
+                      <h4 className="font-medium text-sm mb-2">Configuration:</h4>
+                      <div className="bg-gray-50 p-3 rounded text-xs">
+                        <pre className="whitespace-pre-wrap">{JSON.stringify(integration.configuration, null, 2)}</pre>
                       </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">
+                        <Settings className="h-3 w-3 mr-1" />
+                        Configure
+                      </Button>
+                      <Button size="sm" variant="outline">
+                        <Play className="h-3 w-3 mr-1" />
+                        Test
+                      </Button>
+                      <Button size="sm" variant="outline">
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Sync Now
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="api">
+          <div className="space-y-6">
+            <Alert>
+              <Code className="h-4 w-4" />
+              <AlertDescription>
+                Use these REST API endpoints to integrate CAPRI data with your security tools and custom applications.
+                All endpoints require API key authentication.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4">
+              {apiEndpoints.map((endpoint, index) => (
+                <Card key={index}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Badge
+                        className={
+                          endpoint.method === "GET"
+                            ? "bg-green-500"
+                            : endpoint.method === "POST"
+                              ? "bg-blue-500"
+                              : endpoint.method === "PUT"
+                                ? "bg-yellow-500"
+                                : "bg-red-500"
+                        }
+                      >
+                        {endpoint.method}
+                      </Badge>
+                      <code className="text-sm font-mono">{endpoint.path}</code>
+                    </CardTitle>
+                    <CardDescription>{endpoint.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Parameters */}
+                      {endpoint.parameters && (
+                        <div>
+                          <h4 className="font-medium text-sm mb-2">Parameters:</h4>
+                          <div className="space-y-2">
+                            {Object.entries(endpoint.parameters).map(([param, desc]) => (
+                              <div key={param} className="flex items-start gap-2 text-sm">
+                                <code className="bg-gray-100 px-2 py-1 rounded text-xs">{param}</code>
+                                <span className="text-gray-600">{desc}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Example Response */}
                       <div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSiemSync(connection.id)}
-                          disabled={!connection.enabled || connection.status !== "connected"}
-                        >
-                          <Zap className="h-3 w-3 mr-1" />
-                          Sync Now
-                        </Button>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-sm">Example Response:</h4>
+                          <Button size="sm" variant="outline" onClick={() => copyToClipboard(endpoint.example)}>
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy
+                          </Button>
+                        </div>
+                        <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-x-auto">
+                          <pre>{endpoint.example}</pre>
+                        </div>
+                      </div>
+
+                      {/* cURL Example */}
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">cURL Example:</h4>
+                        <div className="bg-gray-100 p-3 rounded font-mono text-xs overflow-x-auto">
+                          <code>
+                            curl -X {endpoint.method} \<br />
+                            &nbsp;&nbsp;"https://api.cisa-capri.gov{endpoint.path}" \<br />
+                            &nbsp;&nbsp;-H "Authorization: Bearer YOUR_API_KEY" \<br />
+                            &nbsp;&nbsp;-H "Content-Type: application/json"
+                            {endpoint.method === "POST" && (
+                              <>
+                                \<br />
+                                &nbsp;&nbsp;-d '{JSON.stringify({ example: "data" }, null, 2)}'
+                              </>
+                            )}
+                          </code>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
-
-            {/* Add New SIEM Connection */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Add New SIEM Connection</CardTitle>
-                <CardDescription>Connect to additional SIEM platforms</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="siem-name">Connection Name</Label>
-                  <Input id="siem-name" placeholder="My SIEM Instance" />
-                </div>
-                <div>
-                  <Label htmlFor="siem-type">SIEM Type</Label>
-                  <select id="siem-type" className="w-full p-2 border rounded-md">
-                    <option value="splunk">Splunk</option>
-                    <option value="sentinel">Microsoft Sentinel</option>
-                    <option value="qradar">IBM QRadar</option>
-                    <option value="elastic">Elastic Security</option>
-                    <option value="chronicle">Google Chronicle</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="siem-endpoint">Endpoint URL</Label>
-                  <Input id="siem-endpoint" placeholder="https://your-siem.company.com" />
-                </div>
-                <div>
-                  <Label htmlFor="siem-token">API Token</Label>
-                  <Input id="siem-token" type="password" placeholder="Your API token" />
-                </div>
-                <Button className="w-full bg-[#005288] hover:bg-[#003e66]">
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Test & Add Connection
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="webhooks">
+        <TabsContent value="configure">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Webhook Configuration */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Webhook className="h-5 w-5" />
-                  Webhook Configuration
-                </CardTitle>
-                <CardDescription>Configure webhooks for real-time notifications</CardDescription>
+                <CardTitle>Add New Integration</CardTitle>
+                <CardDescription>Configure a new SIEM, SOAR, or security tool integration</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="webhook-enabled">Enable Webhooks</Label>
-                  <Switch
-                    id="webhook-enabled"
-                    checked={webhookConfig.enabled}
-                    onCheckedChange={(enabled) => setWebhookConfig((prev) => ({ ...prev, enabled }))}
-                  />
-                </div>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Integration Type</label>
+                    <select className="w-full p-2 border rounded-md">
+                      <option value="">Select integration type...</option>
+                      <option value="splunk">Splunk Enterprise Security</option>
+                      <option value="sentinel">Microsoft Sentinel</option>
+                      <option value="qradar">IBM QRadar</option>
+                      <option value="phantom">Splunk Phantom (SOAR)</option>
+                      <option value="xsoar">Cortex XSOAR</option>
+                      <option value="crowdstrike">CrowdStrike Falcon</option>
+                      <option value="custom">Custom REST API</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <Label htmlFor="webhook-url">Webhook URL</Label>
-                  <Input
-                    id="webhook-url"
-                    value={webhookConfig.url}
-                    onChange={(e) => setWebhookConfig((prev) => ({ ...prev, url: e.target.value }))}
-                    placeholder="https://hooks.slack.com/services/..."
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Endpoint URL</label>
+                    <Input
+                      placeholder="https://your-siem.company.com/api/endpoint"
+                      value={endpoint}
+                      onChange={(e) => setEndpoint(e.target.value)}
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="webhook-method">HTTP Method</Label>
-                  <select
-                    id="webhook-method"
-                    value={webhookConfig.method}
-                    onChange={(e) =>
-                      setWebhookConfig((prev) => ({ ...prev, method: e.target.value as "POST" | "PUT" }))
-                    }
-                    className="w-full p-2 border rounded-md"
-                  >
-                    <option value="POST">POST</option>
-                    <option value="PUT">PUT</option>
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">API Key / Token</label>
+                    <Input
+                      type="password"
+                      placeholder="Enter your API key or authentication token"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="webhook-headers">Custom Headers (JSON)</Label>
-                  <Textarea
-                    id="webhook-headers"
-                    value={JSON.stringify(webhookConfig.headers, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        const headers = JSON.parse(e.target.value)
-                        setWebhookConfig((prev) => ({ ...prev, headers }))
-                      } catch (error) {
-                        // Invalid JSON, ignore
-                      }
-                    }}
-                    rows={4}
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Data Format</label>
+                    <select className="w-full p-2 border rounded-md">
+                      <option value="json">JSON</option>
+                      <option value="xml">XML</option>
+                      <option value="csv">CSV</option>
+                      <option value="syslog">Syslog</option>
+                    </select>
+                  </div>
 
-                <div className="flex gap-2">
-                  <Button onClick={handleTestWebhook} disabled={!webhookConfig.enabled} className="flex-1">
-                    <Send className="h-4 w-4 mr-2" />
-                    Test Webhook
-                  </Button>
-                  <Button variant="outline" className="flex-1 bg-transparent">
-                    Save Configuration
-                  </Button>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Sync Frequency</label>
+                    <select className="w-full p-2 border rounded-md">
+                      <option value="realtime">Real-time</option>
+                      <option value="5min">Every 5 minutes</option>
+                      <option value="15min">Every 15 minutes</option>
+                      <option value="1hour">Every hour</option>
+                      <option value="daily">Daily</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button onClick={handleTestConnection} className="flex-1">
+                      <Play className="h-4 w-4 mr-1" />
+                      Test Connection
+                    </Button>
+                    <Button variant="outline" className="flex-1 bg-transparent">
+                      <Settings className="h-4 w-4 mr-1" />
+                      Advanced Config
+                    </Button>
+                  </div>
+
+                  {testResult && (
+                    <Alert>
+                      <CheckCircle className="h-4 w-4" />
+                      <AlertDescription>{testResult}</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Webhook Events */}
             <Card>
               <CardHeader>
-                <CardTitle>Webhook Events</CardTitle>
-                <CardDescription>Select which events trigger webhook notifications</CardDescription>
+                <CardTitle>Integration Templates</CardTitle>
+                <CardDescription>Pre-configured templates for popular security tools</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { id: "high_severity_alert", label: "High Severity Alerts", description: "CAPRI score >= 4.0" },
                     {
-                      id: "capri_score_change",
-                      label: "CAPRI Score Changes",
-                      description: "Significant score fluctuations",
+                      name: "Splunk HEC",
+                      description: "HTTP Event Collector for Splunk Enterprise",
+                      config: "JSON over HTTPS",
                     },
-                    { id: "new_threat_detected", label: "New Threats", description: "Novel threat indicators" },
                     {
-                      id: "sector_compromise",
-                      label: "Sector Compromise",
-                      description: "Critical infrastructure targeting",
+                      name: "Sentinel Data Connector",
+                      description: "Microsoft Sentinel custom log ingestion",
+                      config: "REST API with Azure AD auth",
                     },
-                    { id: "kev_alert", label: "KEV Alerts", description: "Known Exploited Vulnerabilities" },
-                    { id: "system_status", label: "System Status", description: "Platform health updates" },
-                  ].map((event) => (
-                    <div key={event.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                      <Switch
-                        checked={webhookConfig.events.includes(event.id)}
-                        onCheckedChange={(checked) => {
-                          setWebhookConfig((prev) => ({
-                            ...prev,
-                            events: checked ? [...prev.events, event.id] : prev.events.filter((e) => e !== event.id),
-                          }))
-                        }}
-                      />
-                      <div>
-                        <div className="font-medium">{event.label}</div>
-                        <div className="text-sm text-gray-600">{event.description}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="api">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* API Key Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  API Authentication
-                </CardTitle>
-                <CardDescription>Manage API keys for external integrations</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="api-key">Current API Key</Label>
-                  <div className="flex gap-2">
-                    <Input id="api-key" value={apiKey} readOnly className="font-mono text-sm" />
-                    <Button variant="outline" onClick={() => navigator.clipboard.writeText(apiKey)}>
-                      Copy
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center gap-2 text-yellow-800">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span className="font-medium">Security Notice</span>
-                  </div>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Keep your API key secure. Include it in the Authorization header as "Bearer {apiKey}"
-                  </p>
-                </div>
-
-                <Button
-                  variant="outline"
-                  onClick={() => setApiKey("capri_api_key_" + Math.random().toString(36).substr(2, 9))}
-                  className="w-full"
-                >
-                  Generate New API Key
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* API Endpoints */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  Available API Endpoints
-                </CardTitle>
-                <CardDescription>RESTful API endpoints for external tool integration</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {apiEndpoints.map((endpoint, index) => (
-                    <div key={index} className="p-3 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            className={`${
-                              endpoint.method === "GET"
-                                ? "bg-green-100 text-green-800"
-                                : endpoint.method === "POST"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : endpoint.method === "PUT"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {endpoint.method}
-                          </Badge>
-                          <code className="text-sm font-mono">{endpoint.path}</code>
-                        </div>
-                        {endpoint.authenticated && (
-                          <Badge variant="outline" className="text-xs">
-                            <Key className="h-3 w-3 mr-1" />
-                            Auth Required
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-600">{endpoint.description}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="text-sm">
-                    <strong>Base URL:</strong> <code>https://capri.cisa.gov</code>
-                  </div>
-                  <div className="text-sm mt-1">
-                    <strong>Rate Limit:</strong> 1000 requests per hour
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="logs">
-          <Card>
-            <CardHeader>
-              <CardTitle>Integration Activity Logs</CardTitle>
-              <CardDescription>Recent integration events and status updates</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[
-                  {
-                    timestamp: "2024-01-15 14:32:15",
-                    type: "success",
-                    message: "Splunk Enterprise sync completed - 45 alerts sent",
-                    details: "Connection: splunk-prod",
-                  },
-                  {
-                    timestamp: "2024-01-15 14:30:22",
-                    type: "info",
-                    message: "Webhook notification sent to Slack",
-                    details: "Event: high_severity_alert",
-                  },
-                  {
-                    timestamp: "2024-01-15 14:28:45",
-                    type: "warning",
-                    message: "Microsoft Sentinel sync delayed",
-                    details: "Retrying in 5 minutes",
-                  },
-                  {
-                    timestamp: "2024-01-15 14:25:10",
-                    type: "error",
-                    message: "IBM QRadar connection failed",
-                    details: "Authentication error - check API token",
-                  },
-                  {
-                    timestamp: "2024-01-15 14:20:33",
-                    type: "success",
-                    message: "API key regenerated",
-                    details: "Previous key revoked",
-                  },
-                ].map((log, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 border rounded-lg">
-                    <div
-                      className={`w-2 h-2 rounded-full mt-2 ${
-                        log.type === "success"
-                          ? "bg-green-500"
-                          : log.type === "error"
-                            ? "bg-red-500"
-                            : log.type === "warning"
-                              ? "bg-yellow-500"
-                              : "bg-blue-500"
-                      }`}
-                    />
-                    <div className="flex-1">
+                    {
+                      name: "QRadar Reference Set",
+                      description: "IBM QRadar threat intelligence feed",
+                      config: "REST API with API key",
+                    },
+                    {
+                      name: "MISP Integration",
+                      description: "Malware Information Sharing Platform",
+                      config: "MISP API with PyMISP",
+                    },
+                    {
+                      name: "STIX/TAXII Feed",
+                      description: "Structured threat intelligence feed",
+                      config: "TAXII 2.1 compliant",
+                    },
+                  ].map((template, index) => (
+                    <div key={index} className="border rounded-lg p-3">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">{log.message}</span>
-                        <span className="text-xs text-gray-500">{log.timestamp}</span>
+                        <div>
+                          <h4 className="font-medium text-sm">{template.name}</h4>
+                          <p className="text-xs text-gray-600">{template.description}</p>
+                          <p className="text-xs text-blue-600">{template.config}</p>
+                        </div>
+                        <Button size="sm" variant="outline">
+                          Use Template
+                        </Button>
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">{log.details}</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -99,9 +99,22 @@ export function HistoricalTrends({ alerts, sectorScores }: HistoricalTrendsProps
     const previous = historicalData[historicalData.length - 2]
     const weekAgo = historicalData[Math.max(0, historicalData.length - 7)]
 
-    const scoreChange = latest.overallScore - previous.overallScore
-    const weeklyChange = latest.overallScore - weekAgo.overallScore
-    const alertChange = latest.totalAlerts - previous.totalAlerts
+    // Get sector-specific values or overall values
+    const getLatestScore = () =>
+      selectedSector === "all" ? latest.overallScore : latest.sectors[selectedSector]?.score || 0
+    const getPreviousScore = () =>
+      selectedSector === "all" ? previous.overallScore : previous.sectors[selectedSector]?.score || 0
+    const getWeekAgoScore = () =>
+      selectedSector === "all" ? weekAgo.overallScore : weekAgo.sectors[selectedSector]?.score || 0
+
+    const getLatestAlerts = () =>
+      selectedSector === "all" ? latest.totalAlerts : latest.sectors[selectedSector]?.alerts || 0
+    const getPreviousAlerts = () =>
+      selectedSector === "all" ? previous.totalAlerts : previous.sectors[selectedSector]?.alerts || 0
+
+    const scoreChange = getLatestScore() - getPreviousScore()
+    const weeklyChange = getLatestScore() - getWeekAgoScore()
+    const alertChange = getLatestAlerts() - getPreviousAlerts()
 
     return {
       scoreChange,
@@ -109,7 +122,7 @@ export function HistoricalTrends({ alerts, sectorScores }: HistoricalTrendsProps
       alertChange,
       trend: scoreChange > 0.1 ? "up" : scoreChange < -0.1 ? "down" : "stable",
     }
-  }, [historicalData])
+  }, [historicalData, selectedSector])
 
   // Prepare chart data based on selected sector
   const chartData = useMemo(() => {

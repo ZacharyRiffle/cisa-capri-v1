@@ -17,6 +17,7 @@ export function generateSampleAlerts(): Alert[] {
       summary:
         "CISA has identified active exploitation of a critical vulnerability (CVE-2024-0001) in Schneider Electric industrial control systems used across energy sector facilities.",
       url: "https://www.cisa.gov/news-events/alerts/2024/01/15/critical-vulnerability-industrial-control-systems",
+      source: "CISA",
     },
     {
       id: "aa24-002a",
@@ -31,6 +32,7 @@ export function generateSampleAlerts(): Alert[] {
       summary:
         "Multiple healthcare organizations report ransomware infections affecting patient care systems. Threat actors exploiting unpatched VPN vulnerabilities.",
       url: "https://www.cisa.gov/news-events/alerts/2024/01/15/ransomware-campaign-targeting-healthcare",
+      source: "CISA",
     },
     {
       id: "aa24-003a",
@@ -45,6 +47,7 @@ export function generateSampleAlerts(): Alert[] {
       summary:
         "Nation-state actors have compromised a widely-used financial software package, potentially affecting hundreds of financial institutions.",
       url: "https://www.cisa.gov/news-events/alerts/2024/01/15/supply-chain-compromise-financial-software",
+      source: "CISA",
     },
 
     // Medium Priority Alerts
@@ -61,6 +64,7 @@ export function generateSampleAlerts(): Alert[] {
       summary:
         "Sophisticated phishing emails targeting transportation sector employees with malicious attachments designed to steal credentials.",
       url: "https://www.cisa.gov/news-events/alerts/2024/01/15/phishing-campaign-transportation",
+      source: "CISA",
     },
     {
       id: "aa24-005a",
@@ -75,151 +79,7 @@ export function generateSampleAlerts(): Alert[] {
       summary:
         "Security researchers have identified vulnerabilities in HMI software commonly used in water treatment facilities.",
       url: "https://www.cisa.gov/news-events/alerts/2024/01/14/water-treatment-security-advisory",
-    },
-    {
-      id: "aa24-006a",
-      title: "Communications Infrastructure DDoS Attacks",
-      date: new Date(Date.now() - 16 * 60 * 60 * 1000).toISOString(), // 16 hours ago
-      posture: "Shields Ready",
-      sector: "Communications",
-      urgency: "Medium",
-      kev: false,
-      exploitation: true,
-      criticalInfrastructure: false,
-      summary:
-        "Coordinated DDoS attacks against telecommunications providers causing service disruptions in multiple regions.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/14/communications-ddos-attacks",
-    },
-
-    // Historical Alerts (past week)
-    {
-      id: "aa24-007a",
-      title: "Defense Contractor Network Intrusion",
-      date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-      posture: "Shields Up",
-      sector: "Defense",
-      urgency: "High",
-      kev: true,
-      exploitation: true,
-      criticalInfrastructure: true,
-      summary:
-        "Advanced persistent threat group has maintained access to defense contractor networks for several months.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/14/defense-contractor-intrusion",
-    },
-    {
-      id: "aa24-008a",
-      title: "Manufacturing Sector IoT Device Vulnerabilities",
-      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-      posture: "Shields Ready",
-      sector: "Manufacturing",
-      urgency: "Medium",
-      kev: false,
-      exploitation: false,
-      criticalInfrastructure: false,
-      summary: "Multiple vulnerabilities discovered in industrial IoT devices used across manufacturing facilities.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/13/manufacturing-iot-vulnerabilities",
-    },
-    {
-      id: "aa24-009a",
-      title: "Agricultural Systems Malware Campaign",
-      date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
-      posture: "Shields Ready",
-      sector: "Food & Agriculture",
-      urgency: "Low",
-      kev: false,
-      exploitation: false,
-      criticalInfrastructure: false,
-      summary:
-        "Malware targeting agricultural management systems detected, potentially affecting crop monitoring and irrigation systems.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/12/agricultural-malware-campaign",
-    },
-    {
-      id: "aa24-010a",
-      title: "Energy Sector Insider Threat Indicators",
-      date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), // 4 days ago
-      posture: "Shields Ready",
-      sector: "Energy",
-      urgency: "Medium",
-      kev: false,
-      exploitation: false,
-      criticalInfrastructure: true,
-      summary:
-        "Intelligence indicates potential insider threats targeting energy sector organizations with access to critical systems.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/11/energy-insider-threats",
-    },
-
-    // Older alerts for trend analysis
-    {
-      id: "aa24-011a",
-      title: "Healthcare Data Breach Investigation",
-      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
-      posture: "Shields Ready",
-      sector: "Healthcare",
-      urgency: "Medium",
-      kev: false,
-      exploitation: true,
-      criticalInfrastructure: true,
-      summary:
-        "Investigation reveals healthcare data breach affecting millions of patient records through compromised third-party vendor.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/10/healthcare-data-breach",
-    },
-    {
-      id: "aa24-012a",
-      title: "Financial Services API Security Flaws",
-      date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), // 6 days ago
-      posture: "Shields Ready",
-      sector: "Finance",
-      urgency: "Low",
-      kev: false,
-      exploitation: false,
-      criticalInfrastructure: false,
-      summary:
-        "Security researchers identify authentication bypass vulnerabilities in popular financial services APIs.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/09/financial-api-security",
-    },
-    {
-      id: "aa24-013a",
-      title: "Transportation Management System Exploit",
-      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-      posture: "Shields Up",
-      sector: "Transportation",
-      urgency: "High",
-      kev: true,
-      exploitation: true,
-      criticalInfrastructure: true,
-      summary:
-        "Active exploitation of transportation management systems could disrupt logistics and supply chain operations.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/08/transportation-system-exploit",
-    },
-
-    // Additional alerts for comprehensive analytics
-    {
-      id: "aa24-014a",
-      title: "Multi-Sector Credential Harvesting Campaign",
-      date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
-      posture: "Shields Ready",
-      sector: "Communications",
-      urgency: "Medium",
-      kev: false,
-      exploitation: true,
-      criticalInfrastructure: false,
-      summary:
-        "Widespread credential harvesting campaign targeting multiple critical infrastructure sectors through compromised websites.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/05/credential-harvesting-campaign",
-    },
-    {
-      id: "aa24-015a",
-      title: "Water Utility SCADA System Vulnerabilities",
-      date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
-      posture: "Shields Ready",
-      sector: "Water",
-      urgency: "High",
-      kev: true,
-      exploitation: false,
-      criticalInfrastructure: true,
-      summary:
-        "Critical vulnerabilities in SCADA systems used by water utilities could allow remote attackers to disrupt water treatment processes.",
-      url: "https://www.cisa.gov/news-events/alerts/2024/01/01/water-scada-vulnerabilities",
+      source: "CISA",
     },
   ]
 
