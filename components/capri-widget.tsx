@@ -194,63 +194,118 @@ export function CapriWidget({ sectorScores }: CapriWidgetProps) {
 
         {/* Detailed Score Breakdown */}
         <div className="mt-4">
-          <h3 className="text-sm font-medium mb-2">Score Breakdown - {currentSector.sector}</h3>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[80px]">Code</TableHead>
-                <TableHead>Meaning</TableHead>
-                <TableHead className="text-right">Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">P</TableCell>
-                <TableCell>National Posture</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.P || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">X</TableCell>
-                <TableCell>Exploitation Observed</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.X || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">S</TableCell>
-                <TableCell>Sector Match</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.S || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">U</TableCell>
-                <TableCell>Urgency</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.U || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">K</TableCell>
-                <TableCell>KEV Presence</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.K || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">C</TableCell>
-                <TableCell>Critical Infrastructure</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.C || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">R</TableCell>
-                <TableCell>Research Intelligence</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.R || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">T</TableCell>
-                <TableCell>Threat Intelligence</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.T || 0).toFixed(1)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell className="font-medium">CSS</TableCell>
-                <TableCell>Computed Sector Score</TableCell>
-                <TableCell className="text-right">{(currentSector.breakdown.CSS || 0).toFixed(2)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+          <h3 className="text-sm font-medium mb-2">Score Calculation - {currentSector.sector}</h3>
+
+          {/* Show the actual calculation method */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <div className="text-xs text-gray-600 mb-2">Final Score = 1 + (Weighted Intelligence Score × 4)</div>
+            <div className="flex justify-between items-center text-sm">
+              <span>Weighted Intelligence Score:</span>
+              <span className="font-mono">{(currentSector.breakdown.CSS || 0).toFixed(3)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span>Final Calculation:</span>
+              <span className="font-mono">
+                1 + ({(currentSector.breakdown.CSS || 0).toFixed(3)} × 4) = {displayScore}
+              </span>
+            </div>
+          </div>
+
+          {/* Intelligence Category Contributions */}
+          <div className="mb-4">
+            <h4 className="text-sm font-medium mb-2">Intelligence Category Contributions</h4>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Score</TableHead>
+                  <TableHead className="text-right">Weight</TableHead>
+                  <TableHead className="text-right">Contribution</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(INTELLIGENCE_CATEGORIES).map(([key, category]) => {
+                  const score = currentSector.categories[key as keyof typeof currentSector.categories] || 0
+                  const contribution = (score * category.weight) / 100
+                  return (
+                    <TableRow key={key}>
+                      <TableCell className="font-medium">{category.name}</TableCell>
+                      <TableCell className="text-right font-mono">{(score * 100).toFixed(0)}%</TableCell>
+                      <TableCell className="text-right">{category.weight}%</TableCell>
+                      <TableCell className="text-right font-mono">{contribution.toFixed(3)}</TableCell>
+                    </TableRow>
+                  )
+                })}
+                <TableRow className="border-t-2">
+                  <TableCell className="font-bold">Total Weighted Score</TableCell>
+                  <TableCell></TableCell>
+                  <TableCell className="text-right font-bold">100%</TableCell>
+                  <TableCell className="text-right font-mono font-bold">
+                    {(currentSector.breakdown.CSS || 0).toFixed(3)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Individual Factor Scores (for reference) */}
+          <div>
+            <h4 className="text-sm font-medium mb-2">Individual Factor Scores (Reference)</h4>
+            <div className="text-xs text-gray-600 mb-2">
+              These are individual component scores used in the intelligence category calculations above.
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Code</TableHead>
+                  <TableHead>Meaning</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">P</TableCell>
+                  <TableCell>National Posture</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.P || 0).toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">X</TableCell>
+                  <TableCell>Exploitation Observed</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.X || 0).toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">S</TableCell>
+                  <TableCell>Sector Match</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.S || 0).toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">U</TableCell>
+                  <TableCell>Urgency</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.U || 0).toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">K</TableCell>
+                  <TableCell>KEV Presence</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.K || 0).toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">C</TableCell>
+                  <TableCell>Critical Infrastructure</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.C || 0).toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">R</TableCell>
+                  <TableCell>Research Intelligence</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.R || 0).toFixed(2)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">T</TableCell>
+                  <TableCell>Threat Intelligence</TableCell>
+                  <TableCell className="text-right">{(currentSector.breakdown.T || 0).toFixed(2)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </CardContent>
     </Card>
